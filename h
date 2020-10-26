@@ -18,7 +18,12 @@ def abort(*)
   puts Dir.pwd
   super
 end
-
+def shell
+  `ps ho comm -p #{Process.ppid}`.chomp
+end
+def fish?
+  shell == 'fish'
+end
 term = ARGV.shift
 path = nil
 url  = nil
@@ -26,6 +31,20 @@ url  = nil
 case term
 when "--setup"
   code_root = Pathname.new(ARGV[0] || DEFAULT_CODE_ROOT).expand_path
+  if fish?
+    puts <<-SH
+function h
+  set _h_dir (command h --resolve "/home/kuboon/ghq" "$argv")
+  set _h_ret $status
+  if [ $_h_ret -ne 0 ]
+    return $_h_ret
+  end
+  [ $_h_dir != $PWD ] && cd $_h_dir
+end
+funcsave h
+    SH
+    exit
+  end
   puts <<-SH
 h() {
   _h_dir=$(command h --resolve "#{code_root}" "$@")
@@ -43,6 +62,9 @@ else
   puts "h needs to be hooked into the shell before it can be used."
   puts
 
+  if fish?
+    abort "Usage: h --setup [code-root] | source"
+  end
   abort "Usage: eval \"$(h --setup [code-root])\""
 end
 
